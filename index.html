@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TradeNews Board — Educational Only</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <h1>TradeNews Board</h1>
+    <p class="subtitle">Beginner learning dashboard. Educational only — NOT financial advice.</p>
+  </div>
+  <div class="refresh-box">
+    <span id="refresh-label">Auto-refresh every 60s</span>
+    <span id="last-updated">Last updated: —</span>
+    <button id="refresh-now" type="button">Refresh now</button>
+  </div>
+</header>
+
+<main>
+  <!-- 1. LIVE CHARTS -->
+  <section class="card">
+    <h2>1. Live Charts (TradingView embeds)</h2>
+    <p class="muted">Charts are embedded from TradingView. No scraping. If offline, charts show a notice.</p>
+    <div class="chart-grid">
+      <div class="chart-box">
+        <h3>BTC / USDT</h3>
+        <div class="tradingview-widget-container" style="height:420px;width:100%">
+          <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+          {
+            "autosize": true,
+            "symbol": "BINANCE:BTCUSDT",
+            "interval": "60",
+            "timezone": "Etc/UTC",
+            "theme": "dark",
+            "style": "1",
+            "locale": "en",
+            "allow_symbol_change": true,
+            "calendar": false,
+            "support_host": "https://www.tradingview.com"
+          }
+          </script>
+        </div>
+      </div>
+      <div class="chart-box">
+        <h3>ETH / USDT</h3>
+        <div class="tradingview-widget-container" style="height:420px;width:100%">
+          <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+          {
+            "autosize": true,
+            "symbol": "BINANCE:ETHUSDT",
+            "interval": "60",
+            "timezone": "Etc/UTC",
+            "theme": "dark",
+            "style": "1",
+            "locale": "en",
+            "allow_symbol_change": true,
+            "calendar": false,
+            "support_host": "https://www.tradingview.com"
+          }
+          </script>
+        </div>
+      </div>
+      <div class="chart-box">
+        <h3>SOL / USDT</h3>
+        <div class="tradingview-widget-container" style="height:420px;width:100%">
+          <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+          {
+            "autosize": true,
+            "symbol": "BINANCE:SOLUSDT",
+            "interval": "60",
+            "timezone": "Etc/UTC",
+            "theme": "dark",
+            "style": "1",
+            "locale": "en",
+            "allow_symbol_change": true,
+            "calendar": false,
+            "support_host": "https://www.tradingview.com"
+          }
+          </script>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. LIVE PRICES -->
+  <section class="card">
+    <h2>2. Live Prices (auto-refresh 60s)</h2>
+    <p class="muted">Crypto: Binance.us public API. Currencies: Frankfurter free API (no key). Old data is kept if a refresh fails.</p>
+    <h3>Crypto</h3>
+    <div id="crypto-prices" class="price-grid">
+      <div class="price-card" id="card-BTCUSDT"><h4>BTCUSDT</h4><p class="loading">Loading…</p></div>
+      <div class="price-card" id="card-ETHUSDT"><h4>ETHUSDT</h4><p class="loading">Loading…</p></div>
+      <div class="price-card" id="card-SOLUSDT"><h4>SOLUSDT</h4><p class="loading">Loading…</p></div>
+    </div>
+    <p id="crypto-error" class="error" hidden></p>
+    <h3>Currencies vs USD (live example, no key needed)</h3>
+    <div id="stock-prices" class="price-grid">
+      <div class="price-card" id="card-EUR"><h4>EUR</h4><p class="loading">Loading…</p></div>
+      <div class="price-card" id="card-GBP"><h4>GBP</h4><p class="loading">Loading…</p></div>
+      <div class="price-card" id="card-JPY"><h4>JPY</h4><p class="loading">Loading…</p></div>
+    </div>
+    <p id="stock-error" class="error" hidden></p>
+  </section>
+
+  <!-- 3. INDICATORS -->
+  <section class="card">
+    <h2>3. Indicators — Learning Notes Only</h2>
+    <div class="indicator-grid">
+      <div class="indicator">
+        <h3>RSI-14 (BTC, 1h closes)</h3>
+        <p>Value: <strong id="rsi-value">—</strong></p>
+        <p><span id="rsi-badge" class="badge neutral">NEUTRAL</span></p>
+        <p class="muted" id="rsi-note">Needs 15+ closes to compute.</p>
+      </div>
+      <div class="indicator">
+        <h3>RSI-14 (ETH, 1h closes)</h3>
+        <p>Value: <strong id="rsi-eth-value">—</strong></p>
+        <p><span id="rsi-eth-badge" class="badge neutral">NEUTRAL</span></p>
+      </div>
+      <div class="indicator">
+        <h3>RSI-14 (SOL, 1h closes)</h3>
+        <p>Value: <strong id="rsi-sol-value">—</strong></p>
+        <p><span id="rsi-sol-badge" class="badge neutral">NEUTRAL</span></p>
+      </div>
+      <div class="indicator">
+        <h3>EMA-50 (BTC, 1h closes)</h3>
+        <p>Value: <strong id="ema-value">—</strong></p>
+        <p>Price: <strong id="ema-price">—</strong></p>
+        <p><span id="ema-badge" class="badge neutral">Waiting for data</span></p>
+      </div>
+    </div>
+    <div class="warning-box">
+      <strong>Caution:</strong> This describes the past. It does NOT tell you when to buy/sell.
+      Educational project only. Not financial advice.
+    </div>
+  </section>
+
+  <!-- 4. SIGNALS LOG (UI helper) -->
+  <section class="card">
+    <h2>4. Signals Log — Observations (BTC / ETH / SOL)</h2>
+    <p class="muted">Logged when BTC, ETH or SOL RSI crosses below 30 or above 70. Educational only, not profitable advice. Browser cannot write signals-log.md by itself — copy new lines below into that file.</p>
+    <div class="btn-row">
+      <button id="copy-signals" type="button">Copy new signals</button>
+      <button id="download-signals" type="button">Download signals.txt</button>
+      <button id="clear-signals" type="button">Clear screen list</button>
+    </div>
+    <ul id="signals-list"><li class="muted">No crossings observed yet in this session.</li></ul>
+  </section>
+
+  <!-- 5. NEWS -->
+  <section class="card">
+    <h2>5. Crypto News (CoinDesk RSS)</h2>
+    <p class="muted">Fetched: <span id="news-fetched-at">—</span></p>
+    <ul id="news-list"><li class="loading">Loading headlines…</li></ul>
+    <p id="news-error" class="error" hidden></p>
+  </section>
+</main>
+
+<footer>
+  Educational project only. Not financial advice. Trading is risky. Practice with paper trading.
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
