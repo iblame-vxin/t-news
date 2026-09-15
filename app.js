@@ -26,33 +26,51 @@ function setLastUpdated() {
   $("last-updated").textContent = "Last updated: " + fmtTime(new Date());
 }
 
-// ---------- RSI-14 ----------
-// Standard 0-100 formula on closes. Returns null if not enough data.
+// ---------- RSI-14 (Wilder) ----------
+// Standard Wilder smoothing. Returns null if not enough data.
 function calcRSI(closes, period = 14) {
   if (closes.length < period + 1) return null;
-  const relevant = closes.slice(-(period + 1));
-  let gains = 0, losses = 0;
-  for (let i = 1; i < relevant.length; i++) {
-    const diff = relevant[i] - relevant[i - 1];
-    if (diff >= 0) gains += diff;
-    else losses -= diff;
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff >= 0) avgGain += diff;
+    else avgLoss -= diff;
   }
-  if (losses === 0) return 100;
-  const rs = (gains / period) / (losses / period);
+  avgGain /= period;
+  avgLoss /= period;
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+  }
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
   return 100 - (100 / (1 + rs));
 }
 
-// ---------- EMA-N ----------
+// ---------- EMA-N (span) ----------
 function calcEMA(closes, period = 50) {
   if (closes.length === 0) return null;
-  const n = Math.min(period, closes.length);
-  const slice = closes.slice(-n);
-  const k = 2 / (n + 1);
-  let ema = slice[0];
-  for (let i = 1; i < slice.length; i++) {
-    ema = slice[i] * k + ema * (1 - k);
+  const k = 2 / (period + 1);
+  let ema = closes[0];
+  for (let i = 1; i < closes.length; i++) {
+    ema = closes[i] * k + ema * (1 - k);
   }
   return ema;
+}
+
+// ---------- Tradability guard (from price_guards idea) ----------
+// Returns false for empty / all-NaN / all-zero / flat data.
+function isValidCloses(closes) {
+  if (!Array.isArray(closes) || closes.length === 0) return false;
+  const nums = closes.filter((v) => Number.isFinite(v));
+  if (nums.length === 0) return false;
+  if (nums.every((v) => v === 0)) return false;
+  const first = nums[0];
+  if (nums.every((v) => v === first)) return false;
+  return true;
 }
 
 function renderIndicators(btcPrice, prices) {
@@ -68,7 +86,7 @@ function renderIndicators(btcPrice, prices) {
   updateRsiBox("SOLUSDT", "rsi-sol-value", "rsi-sol-badge", null, prices.SOLUSDT);
 
   const emaBadge = $("ema-badge");
-  if (ema === null || btcPrice === null) {
+  if (!isValidCloses(allCloses) || ema === null || btcPrice === null) {
     $("ema-value").textContent = "—";
     $("ema-price").textContent = btcPrice !== null ? String(btcPrice) : "—";
     emaBadge.textContent = "Waiting for data";
@@ -89,9 +107,16 @@ function renderIndicators(btcPrice, prices) {
 // Helper: update one RSI box + detect crossing for that coin.
 function updateRsiBox(coin, valueId, badgeId, noteId, price) {
   const closes = closesMap[coin] || [];
-  const rsi = calcRSI(closes, 14);
   const badge = $(badgeId);
   if (!$(valueId) || !badge) return;
+  if (!isValidCloses(closes)) {
+    $(valueId).textContent = "— (invalid data)";
+    badge.textContent = "NEUTRAL";
+    badge.className = "badge neutral";
+    if (noteId && $(noteId)) $(noteId).textContent = "Price feed gave empty / zero / flat data. Keeping old values. Currently: " + closes.length + " closes.";
+    return;
+  }
+  const rsi = calcRSI(closes, 14);
   if (rsi === null) {
     $(valueId).textContent = "— (collecting data)";
     badge.textContent = "NEUTRAL";
