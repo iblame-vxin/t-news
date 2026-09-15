@@ -134,6 +134,11 @@
         <p>Price: <strong id="ema-price">—</strong></p>
         <p><span id="ema-badge" class="badge neutral">Waiting for data</span></p>
       </div>
+      <div class="indicator">
+        <h3>ATR-14 (BTC volatility)</h3>
+        <p>Value: <strong id="atr-value">—</strong></p>
+        <p class="muted" id="atr-note">Needs 15+ hourly bars with high/low.</p>
+      </div>
     </div>
     <div class="warning-box">
       <strong>Caution:</strong> This describes the past. It does NOT tell you when to buy/sell.
@@ -144,7 +149,7 @@
   <!-- 4. SIGNALS LOG (UI helper) -->
   <section class="card">
     <h2>4. Signals Log — Observations (BTC / ETH / SOL)</h2>
-    <p class="muted">Logged when BTC, ETH or SOL RSI crosses below 30 or above 70. Educational only, not profitable advice. Browser cannot write signals-log.md by itself — copy new lines below into that file.</p>
+    <p class="muted">Logged when BTC, ETH or SOL RSI crosses below 30 or above 70. <span id="gate-note">Gates: valid data + trend agree + fresh news = high-conviction, else observation.</span> Educational only, not profitable advice. Browser cannot write signals-log.md by itself — copy new lines below into that file.</p>
     <div class="btn-row">
       <button id="copy-signals" type="button">Copy new signals</button>
       <button id="download-signals" type="button">Download signals.txt</button>
@@ -159,6 +164,19 @@
     <p class="muted">Fetched: <span id="news-fetched-at">—</span></p>
     <ul id="news-list"><li class="loading">Loading headlines…</li></ul>
     <p id="news-error" class="error" hidden></p>
+  </section>
+
+  <!-- 6. RISK CALCULATOR -->
+  <section class="card">
+    <h2>6. Risk Calculator — Learning Only (no trade placed)</h2>
+    <p class="muted">Idea from position sizing: risk ≤1% per idea, max 25% in one coin. Educational only.</p>
+    <div class="price-grid">
+      <div class="price-card"><h4>Account $</h4><input id="rk-equity" type="number" value="100" min="1" style="width:100%" /></div>
+      <div class="price-card"><h4>Risk %</h4><input id="rk-risk" type="number" value="1" min="0.1" max="5" step="0.1" style="width:100%" /></div>
+      <div class="price-card"><h4>Entry $</h4><input id="rk-entry" type="number" value="76370" min="1" style="width:100%" /></div>
+      <div class="price-card"><h4>Stop $</h4><input id="rk-stop" type="number" value="75500" min="1" style="width:100%" /></div>
+    </div>
+    <p class="muted" id="rk-out">Enter numbers to see size.</p>
   </section>
 </main>
 

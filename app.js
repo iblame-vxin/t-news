@@ -6,6 +6,7 @@ const CRYPTOS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
 const REFRESH_MS = 60000;
 
 let closesMap = { BTCUSDT: [], ETHUSDT: [], SOLUSDT: [] };   // last up to 50 closes each
+let ohlcMap = { BTCUSDT: [] }; // last up to 50 {h,l,c} for BTC ATR, mirrors klines
 let prevRsiMap = { BTCUSDT: null, ETHUSDT: null, SOLUSDT: null };   // for crossing detection
 let btcCloses = []; // kept for backward compat, mirrors closesMap.BTCUSDT
 let sessionSignals = []; // lines created this session
@@ -61,6 +62,20 @@ function calcEMA(closes, period = 50) {
   return ema;
 }
 
+// ---------- ATR-14 ----------
+// Average True Range from {h,l,c} list. Returns null if not enough data.
+function calcATR(ohlc, period = 14) {
+  if (!Array.isArray(ohlc) || ohlc.length < period + 1) return null;
+  const relevant = ohlc.slice(-(period + 1));
+  let trs = [];
+  for (let i = 1; i < relevant.length; i++) {
+    const h = relevant[i].h, l = relevant[i].l, pc = relevant[i - 1].c;
+    if (!Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(pc)) return null;
+    trs.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)));
+  }
+  return trs.reduce((a, b) => a + b, 0) / trs.length;
+}
+
 // ---------- Tradability guard (from price_guards idea) ----------
 // Returns false for empty / all-NaN / all-zero / flat data.
 function isValidCloses(closes) {
@@ -102,6 +117,18 @@ function renderIndicators(btcPrice, prices) {
       emaBadge.className = "badge below";
     }
   }
+
+  // ATR-14 (BTC volatility)
+  const atr = calcATR(ohlcMap.BTCUSDT || [], 14);
+  if ($("atr-value")) {
+    if (atr === null || !isValidCloses(allCloses)) {
+      $("atr-value").textContent = "—";
+      if ($("atr-note")) $("atr-note").textContent = "Needs 15+ hourly bars with high/low.";
+    } else {
+      $("atr-value").textContent = "$" + atr.toFixed(2);
+      if ($("atr-note")) $("atr-note").textContent = "Avg hourly wiggle over last 14h. Bigger = choppier. For learning slippage idea.";
+    }
+  }
 }
 
 // Helper: update one RSI box + detect crossing for that coin.
@@ -139,6 +166,24 @@ function updateRsiBox(coin, valueId, badgeId, noteId, price) {
   checkRsiCross(coin, rsi, price);
 }
 
+// Gates: valid data + trend agree + fresh news = high-conviction, else observation.
+function passesGates(coin, rsi, price, event) {
+  const closes = closesMap[coin] || [];
+  if (!isValidCloses(closes)) return { high: false, reason: "invalid data" };
+  let trendOk = true;
+  if (coin === "BTCUSDT") {
+    const ema = calcEMA(closesMap.BTCUSDT || [], 50);
+    if (ema !== null && Number.isFinite(price)) {
+      if (event.includes("Oversold")) trendOk = price < ema;
+      if (event.includes("Overbought")) trendOk = price > ema;
+    }
+  }
+  if (!trendOk) return { high: false, reason: "trend disagrees" };
+  const newsTxt = ($("news-fetched-at") && $("news-fetched-at").textContent) || "";
+  if (!newsTxt || newsTxt.includes("—") || newsTxt.toLowerCase().includes("sample")) return { high: false, reason: "news stale" };
+  return { high: true, reason: "passes gates" };
+}
+
 // Log only on crossing (not every poll) to avoid spam.
 function checkRsiCross(coin, rsi, price) {
   const prev = prevRsiMap[coin];
@@ -149,8 +194,10 @@ function checkRsiCross(coin, rsi, price) {
   }
   prevRsiMap[coin] = rsi;
   if (!event || price === null || price === undefined) return;
+  const gate = passesGates(coin, rsi, price, event);
   const short = coin.replace("USDT", "");
-  const line = "[" + utcStamp(new Date()) + "] " + short + " $" + price + " RSI " + rsi.toFixed(0) + " - " + event + ". Educational only.";
+  const tag = gate.high ? "high-conviction (" + gate.reason + ")" : "observation (" + gate.reason + ")";
+  const line = "[" + utcStamp(new Date()) + "] " + short + " $" + price + " RSI " + rsi.toFixed(0) + " - " + event + " [" + tag + "]. Educational only.";
   sessionSignals.push(line);
   try {
     const saved = JSON.parse(localStorage.getItem("tnb_signals") || "[]");
@@ -217,6 +264,9 @@ async function fetchCrypto() {
         if (!res.ok) throw new Error("HTTP " + res.status + " for " + sym);
         const klines = await res.json();
         closesMap[sym] = klines.map((k) => parseFloat(k[4])).slice(-50);
+        if (sym === "BTCUSDT") {
+          ohlcMap.BTCUSDT = klines.map((k) => ({ h: parseFloat(k[2]), l: parseFloat(k[3]), c: parseFloat(k[4]) })).slice(-50);
+        }
       } catch (e1) { /* keep old closes for this coin */ }
     }
     btcCloses = closesMap.BTCUSDT || btcCloses;
@@ -392,6 +442,29 @@ $("clear-signals").addEventListener("click", () => {
 });
 
 // ---------- init ----------
+function updateRisk() {
+  if (!$("rk-equity")) return;
+  const eq = parseFloat($("rk-equity").value) || 0;
+  const riskPct = parseFloat($("rk-risk").value) || 0;
+  const entry = parseFloat($("rk-entry").value) || 0;
+  const stop = parseFloat($("rk-stop").value) || 0;
+  const riskAmt = eq * (riskPct / 100);
+  const perCoin = Math.abs(entry - stop);
+  if (eq <= 0 || entry <= 0 || perCoin <= 0) {
+    $("rk-out").textContent = "Enter valid numbers (stop must differ from entry).";
+    return;
+  }
+  let qty = riskAmt / perCoin;
+  const maxNotional = eq * 0.25;
+  const maxQty = maxNotional / entry;
+  if (qty > maxQty) qty = maxQty;
+  const notional = qty * entry;
+  $("rk-out").textContent = "Risk $" + riskAmt.toFixed(2) + " | Size " + qty.toFixed(6) + " coin (~$" + notional.toFixed(2) + ") | Capped at 25% ($" + maxNotional.toFixed(2) + "). Learning only, no trade placed.";
+}
+["rk-equity", "rk-risk", "rk-entry", "rk-stop"].forEach((id) => {
+  document.getElementById(id)?.addEventListener("input", updateRisk);
+});
+updateRisk();
 renderSignals();
 refreshAll();
 $("refresh-label").textContent = "Auto-refresh every 60s";
